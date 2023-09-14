@@ -52,7 +52,7 @@ create_vector_index_statement = f"""CREATE CUSTOM INDEX IF NOT EXISTS idx_embedd
 session.execute(create_vector_index_statement)
 print("Created index.")
 
-openai.api_key="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"
+openai.api_key=os.environ["OPENAI_API_KEY"]
 
 embedding_model_name = "text-embedding-ada-002"
 
