@@ -13,5 +13,4 @@
    - The DB ID can be found on the main page
    - You can get an application token from the database details page
 
-3. `python -m pip -i requirements.txt`
-4. Run the population command with `python populate.py` - this will take a while as it populates the database, then it will give you the response
+3. Run the population command with `python populate.py` - this will take a while as it populates the database, then it will give you the response
