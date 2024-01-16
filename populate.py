@@ -1,88 +1,114 @@
-from cassandra.cluster import Cluster
-from cassandra.auth import PlainTextAuthProvider
 import json
 import os
-from getpass import getpass
-import openai
-from uuid import uuid4
+from openai import OpenAI
+import cassio
+from langchain.vectorstores import Cassandra
+from langchain.schema import Document
+from dotenv import load_dotenv
+load_dotenv()
 
-try:
-    from google.colab import files
-    IS_COLAB = True
-except ModuleNotFoundError:
-    IS_COLAB = False
-
-ASTRA_DB_SECURE_BUNDLE_PATH = os.environ["ASTRA_DB_SECURE_BUNDLE_PATH"] 
-
-ASTRA_DB_APPLICATION_TOKEN = os.environ["ASTRA_DB_APPLICATION_TOKEN"]
-ASTRA_DB_KEYSPACE = "vector"
-
-cluster = Cluster(
-    cloud={
-        "secure_connect_bundle": ASTRA_DB_SECURE_BUNDLE_PATH,
-    },
-    auth_provider=PlainTextAuthProvider(
-        "token",
-        ASTRA_DB_APPLICATION_TOKEN,
-    ),
+cassio.init(
+    token=os.environ["ASTRA_DB_APPLICATION_TOKEN"],
+    database_id=os.environ["ASTRA_DB_ID"],
 )
-session = cluster.connect()
-keyspace = ASTRA_DB_KEYSPACE 
 
-delete_table_statement = f"""DROP TABLE IF EXISTS vector.shakespeare_cql;"""
-session.execute(delete_table_statement)
+client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+from langchain.embeddings import OpenAIEmbeddings
+myEmbedding = OpenAIEmbeddings()
+completion_model_name = "gpt-3.5-turbo"
 
-create_table_statement = f"""CREATE TABLE IF NOT EXISTS vector.shakespeare_cql (
-    dataline INT PRIMARY KEY,
-    play TEXT,
-    player TEXT,
-    playerline TEXT,
-    embedding_vector VECTOR<FLOAT, 1536>
-);"""
+vector_store = Cassandra(
+    embedding=myEmbedding, # <-- meaning: use the OpenAI Embeddings loaded above
+    table_name="shakespeare_act5",
+    session=None,  # <-- meaning: use the global defaults from cassio.init()
+    keyspace="linkedin_vector",  
+)
 
-session.execute(create_table_statement)
-print("Created table.")
+def populate_database():
+    input_lines = json.load(open("./romeo_astra_act5.json"))
 
-create_vector_index_statement = f"""CREATE CUSTOM INDEX IF NOT EXISTS idx_embedding_vector
-    ON {keyspace}.shakespeare_cql (embedding_vector)
-    USING 'org.apache.cassandra.index.sai.StorageAttachedIndex'
-    WITH OPTIONS = {{'similarity_function' : 'dot_product'}};
+    input_documents = []
+    current_quote = ""
+    # Create documents from the quotes
+    
+    for input_line in input_lines:
+        if (input_line["ActSceneLine"] != ""):
+            (act, scene, line) = input_line["ActSceneLine"].split(".")
+            location = "Act {}, Scene {}, Line {}".format(act, scene, line)
+            if (scene != "3"):
+                continue
+            metadata = {"act": act, "scene": scene, "line": line}
+        else:
+            location = ""
+            metadata = {}
+ 
+        if '.' not in input_line["PlayerLine"]:
+            current_quote += " " + input_line["PlayerLine"]
+            continue
+
+        quote_input = "{} : {} ".format(location, current_quote)
+        current_quote = ""
+        print(quote_input + "\n")
+
+        input_document = Document(page_content=quote_input)
+        input_documents.append(input_document)
+
+    retriever = vector_store.as_retriever(search_kwargs={"k": 5})
+
+    # Add documents to the vector store
+    print(f"Adding {len(input_documents)} documents ... ", end="")
+    vector_store.add_documents(documents=input_documents, batch_size=50)
+    print("Done.")
+
+generation_prompt_template = """"
+Create a summary from the documents.  Answer the question using the examples in 20-50 words
+
+REFERENCE TOPIC: {topic}
+
+ACTUAL EXAMPLES:
+{examples}
 """
 
-session.execute(create_vector_index_statement)
-print("Created index.")
+def generate_quote(topic, n=10, author=None, tags=None):
+    retriever = vector_store.as_retriever(search_kwargs={"k": n})
+    quotes = retriever.get_relevant_documents('How did Astra die?')
+    
+    if quotes:
+        examples = ""
+        for doc in quotes:
+            examples += "<line> " + doc.page_content + "</line>\n"
+        
 
-openai.api_key=os.environ["OPENAI_API_KEY"]
+        print ("\n".join(doc.page_content for doc in quotes))
+        
+        system_prompt = "You will be provided with a series of sections from a Shakespearean play, delimited with xml tags. " + \
+                        "Summarize the plot using the entirety of the data provided, using the act, scene and line to order the sections." 
 
-embedding_model_name = "text-embedding-ada-002"
+        # Generate the answer using the prompt
+        prompt = generation_prompt_template.format(
+            topic=topic,
+            wordcount=50,
+            examples = examples
+        )
+        response = client.chat.completions.create(model=completion_model_name,
+        messages=[{"role": "user", "content": prompt},
+                  {"role": "system", "content":system_prompt}],
+        temperature=0,
+        max_tokens=1000)
+        return response.choices[0].message.content.replace('"', '').strip()
+    else:
+        print("** no quotes found.")
+        return None
 
-quote_array = json.load(open("/Users/kirstenhunter/Downloads/shakespeare.json"))
+#populate_database()
 
-prepared_insertion = session.prepare(
-    f"INSERT INTO vector.shakespeare_cql (dataline, player, playerline, embedding_vector) VALUES (?,?,?,?)"
-)
+q_topic = generate_quote("How did Astra die?")
+print("\nAn answer to the question:")
+print(q_topic)
 
-# 
-for index in range(len(quote_array)):
-    if quote_array[index]["Play"] != "Romeo and Juliet":
-        continue
-    quote_id = quote_array[index]["Dataline"]
-    previous_quote = ""
-    next_quote = ""
-    if index > 0:
-        previous_quote = quote_array[index-1]["PlayerLine"]
-    if index < len(quote_array):
-        next_quote = quote_array[index+1]["PlayerLine"]
-    quote_input = previous_quote + "\n" + quote_array[index]["PlayerLine"] + "\n" + next_quote
-    result = openai.Embedding.create(
-        input=quote_input,
-        engine=embedding_model_name
-    )
-
-    session.execute(
-        prepared_insertion,
-        (quote_id, quote_array[index]["Player"], quote_array[index]["PlayerLine"], result.data[0].embedding)
-    )
-
-    print(quote_array[index]["Player"] + " : " + quote_array[index]["PlayerLine"])
-
+# Sample answer:
+# Astra dies in Act 5, Scene 3. 
+# She is found dead alongside Stargate. 
+# It is revealed that Astra took a sleeping potion to fake her death, 
+# but Stargate was not aware of this plan. 
+# Astra's death causes great grief and tragedy for those involved.
