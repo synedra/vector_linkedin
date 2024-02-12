@@ -41,10 +41,18 @@ ASTRA_DB_ID=<id>
 </tr>
 
 <tr>
-<td valign=top> 6. Run the population command with `python populate.py` to get the answer
+<td valign=top> 6. Change directories to Chapter3, then run the population command with `python populate.py` to get the answer
 </td>
 <td> <pre>
 python populate.py
+</pre>
+</td>
+</tr>
+<tr>
+<td valign=top> 7. Change directories to Chapter4, then run the split command with `python split.py` to separate the training and testing data.
+</td>
+<td> <pre>
+python split.py
 </pre>
 </td>
 </tr>

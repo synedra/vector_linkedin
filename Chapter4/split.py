@@ -28,7 +28,7 @@ def split_csv(input_file, train_file, test_file, split_ratio=0.8, random_seed=No
         csv_writer.writerows(test_data)
 
 # Example usage
-input_file = 'imdb_top_1000.csv'  # Replace 'data.csv' with the path to your CSV file
+input_file = 'imdb_top_1000.csv'  
 train_file = 'split_train_data.csv'
 test_file = 'split_test_data.csv'
 split_ratio = 0.9  # 80% training data, 20% testing data
