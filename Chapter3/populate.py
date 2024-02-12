@@ -21,11 +21,12 @@ vector_store = Cassandra(
     embedding=myEmbedding, # <-- meaning: use the OpenAI Embeddings loaded above
     table_name="shakespeare_act5",
     session=None,  # <-- meaning: use the global defaults from cassio.init()
-    keyspace="linkedin_vector",  
+    keyspace="default_keyspace",  
 )
 
 def populate_database():
-    input_lines = json.load(open("./romeo_astra_act5.json"))
+    print ("Loading files")
+    input_lines = json.load(open("./romeo_astra_scene.json"))
 
     input_documents = []
     current_quote = ""
@@ -48,7 +49,7 @@ def populate_database():
 
         quote_input = "{} : {} ".format(location, current_quote)
         current_quote = ""
-        print(quote_input + "\n")
+        #print(quote_input + "\n")
 
         input_document = Document(page_content=quote_input)
         input_documents.append(input_document)
@@ -93,14 +94,14 @@ def generate_quote(topic, n=10, author=None, tags=None):
         response = client.chat.completions.create(model=completion_model_name,
         messages=[{"role": "user", "content": prompt},
                   {"role": "system", "content":system_prompt}],
-        temperature=0,
+        temperature=.7,
         max_tokens=1000)
         return response.choices[0].message.content.replace('"', '').strip()
     else:
         print("** no quotes found.")
         return None
 
-#populate_database()
+populate_database()
 
 q_topic = generate_quote("How did Astra die?")
 print("\nAn answer to the question:")

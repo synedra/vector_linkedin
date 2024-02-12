@@ -30,7 +30,7 @@
 </tr>
 
 <tr>
-<td valign=top> 5. Populate an .env file with the items from the previous steps.
+<td valign=top> 5. Populate an .env file in the Chapter3 directory with the items from the previous steps.
 </td>
 <td> <pre>
 OPENAI_API_KEY=<key>
@@ -44,6 +44,7 @@ ASTRA_DB_ID=<id>
 <td valign=top> 6. Change directories to Chapter3, then run the population command with `python populate.py` to get the answer
 </td>
 <td> <pre>
+cd Chapter3
 python populate.py
 </pre>
 </td>
@@ -52,6 +53,7 @@ python populate.py
 <td valign=top> 7. Change directories to Chapter4, then run the split command with `python split.py` to separate the training and testing data.
 </td>
 <td> <pre>
+cd ../Chapter4
 python split.py
 </pre>
 </td>
