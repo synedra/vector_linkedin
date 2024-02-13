@@ -33,17 +33,20 @@ def populate_database():
     # Create documents from the quotes
     
     for input_line in input_lines:
+        player = input_line["Player"]
+            
         if (input_line["ActSceneLine"] != ""):
             (act, scene, line) = input_line["ActSceneLine"].split(".")
-            location = "Act {}, Scene {}, Line {}".format(act, scene, line)
             if (scene != "3"):
                 continue
+            location = "Act {}, Scene {}, Line {} : {}".format(act, scene, line, player)
+            
             metadata = {"act": act, "scene": scene, "line": line}
         else:
             location = ""
             metadata = {}
  
-        if '.' not in input_line["PlayerLine"]:
+        if input_line["PlayerLine"][-1] != '.':
             current_quote += " " + input_line["PlayerLine"]
             continue
 
@@ -54,15 +57,13 @@ def populate_database():
         input_document = Document(page_content=quote_input)
         input_documents.append(input_document)
 
-    retriever = vector_store.as_retriever(search_kwargs={"k": 5})
-
     # Add documents to the vector store
     print(f"Adding {len(input_documents)} documents ... ", end="")
     vector_store.add_documents(documents=input_documents, batch_size=50)
     print("Done.")
 
 generation_prompt_template = """"
-Answer the question using only the documents provided. 
+Answer the question using only the documents provided. Use 10 to 20 words.
 
 REFERENCE TOPIC: {topic}
 
@@ -70,9 +71,9 @@ ACTUAL EXAMPLES:
 {examples}
 """
 
-def generate_quote(topic, n=10, author=None, tags=None):
-    retriever = vector_store.as_retriever(search_kwargs={"k": 10})
-    quotes = retriever.get_relevant_documents('How did Astra die?')
+def generate_quote(topic, n=30):
+    retriever = vector_store.as_retriever(search_kwargs={"k": n})
+    quotes = retriever.get_relevant_documents(topic)
     
     if quotes:
         examples = ""
@@ -88,20 +89,20 @@ def generate_quote(topic, n=10, author=None, tags=None):
         # Generate the answer using the prompt
         prompt = generation_prompt_template.format(
             topic=topic,
-            wordcount=50,
+            wordcount=20,
             examples = examples
         )
         response = client.chat.completions.create(model=completion_model_name,
         messages=[{"role": "user", "content": prompt},
                   {"role": "system", "content":system_prompt}],
-        temperature=.7,
+        temperature=1,
         max_tokens=1000)
         return response.choices[0].message.content.replace('"', '').strip()
     else:
         print("** no quotes found.")
         return None
 
-populate_database()
+#populate_database()
 
 q_topic = generate_quote("How did Astra die?")
 print("\nAn answer to the question:")
