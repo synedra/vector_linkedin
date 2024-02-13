@@ -102,7 +102,7 @@ def generate_quote(topic, n=30):
         print("** no quotes found.")
         return None
 
-#populate_database()
+populate_database()
 
 q_topic = generate_quote("How did Astra die?")
 print("\nAn answer to the question:")
