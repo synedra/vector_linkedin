@@ -20,6 +20,8 @@ data['Gross'] = data['Gross'].astype('float64')
 data['Gross'] = data['Gross'].replace(np.nan, 0)
 data['Gross'] = data['Gross'].astype(int)
 
+print(data.dtypes)
+
 X = data.drop(columns=['IMDB_Rating'])
 y = data['IMDB_Rating']
 # Split the data into training and testing sets
