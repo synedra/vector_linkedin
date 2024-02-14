@@ -13,6 +13,7 @@ data.drop(columns=['Released_Year','Poster_Link', 'Certificate','Overview','Dire
 
 data['IMDB_Rating'] = pd.to_numeric(data['IMDB_Rating'], errors='coerce')
 
+print(data.head())
 
 # Replace the Gross string with the appropriate integer value
 data['Gross'] = data['Gross'].str.replace(',', '')
@@ -21,6 +22,7 @@ data['Gross'] = data['Gross'].replace(np.nan, 0)
 data['Gross'] = data['Gross'].astype(int)
 
 print(data.dtypes)
+print(data.head())
 
 X = data.drop(columns=['IMDB_Rating'])
 y = data['IMDB_Rating']
